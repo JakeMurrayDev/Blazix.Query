@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36221.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blazix.Query", "Blazix.Query\Blazix.Query.csproj", "{67C52641-872B-41C3-8DBF-486E89B48754}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blazix.Query.Tests", "Blazix.Query.Tests\Blazix.Query.Tests.csproj", "{6C6E0ACF-524F-4CDA-A88F-7E23D059AD5F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{67C52641-872B-41C3-8DBF-486E89B48754}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{67C52641-872B-41C3-8DBF-486E89B48754}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{67C52641-872B-41C3-8DBF-486E89B48754}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{67C52641-872B-41C3-8DBF-486E89B48754}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6C6E0ACF-524F-4CDA-A88F-7E23D059AD5F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6C6E0ACF-524F-4CDA-A88F-7E23D059AD5F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6C6E0ACF-524F-4CDA-A88F-7E23D059AD5F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6C6E0ACF-524F-4CDA-A88F-7E23D059AD5F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1A4CDFB4-6706-4EDC-A9F3-4F92E38F80D6}
+	EndGlobalSection
+EndGlobal
