@@ -6,9 +6,21 @@
 public class QueryOptions
 {
     /// <summary>
-    /// The time after which the query is considered stale.
+    /// Gets or sets time after which the query is considered stale.
     /// </summary>
     public TimeSpan StaleTime { get; set; } = TimeSpan.Zero;
+    /// <summary>
+    /// Gets or sets whether the query is enabled.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+    /// <summary>
+    /// Gets or sets the number of times to retry the query if it fails.
+    /// </summary>
+    public int Retry { get; set; } = 0;
+    /// <summary>
+    /// Gets or sets the delay between retries.
+    /// </summary>
+    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(1);
 }
 
 
@@ -48,7 +60,8 @@ public sealed class Query<TData> : IDisposable where TData : class
     /// <summary>
     /// True if the query is stale.
     /// </summary>
-    public bool IsStale => DateTime.UtcNow - cacheEntry.LastSuccessAt > options.StaleTime;
+    public bool IsStale => cacheEntry.IsStale(options.StaleTime);
+
     /// <summary>
     /// True if the query is in the 'Pending' state.
     /// </summary>
@@ -99,23 +112,37 @@ public sealed class Query<TData> : IDisposable where TData : class
         this.stateChangedCallback = stateChangedCallback;
         this.options = options ?? new QueryOptions();
 
-        // Get the cache entry and subscribe to its changes
         cacheEntry = this.client.GetCacheEntry<TData>(this.key);
         cacheEntry.Subscribe(this.stateChangedCallback);
 
-        // Initial fetch if needed
         InitializeFetch();
     }
 
     private void InitializeFetch()
     {
-        // If we have data and it's not stale, we don't need to fetch.
+        if (!options.Enabled)
+        {
+            return;
+        }
+
         if (Status == QueryStatus.Success && !IsStale)
         {
             return;
         }
 
-        _ = client.FetchQueryAsync(key, queryFn);
+        _ = client.FetchQueryAsync(key, queryFn, options);
+    }
+
+    /// <summary>
+    /// Manually refetches the query.
+    /// </summary>
+    public Task RefetchAsync()
+    {
+        if (!options.Enabled)
+        {
+            return Task.CompletedTask;
+        }
+        return client.FetchQueryAsync(key, queryFn, options);
     }
 
     /// <inheritdoc />

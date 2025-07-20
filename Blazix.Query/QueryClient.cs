@@ -1,13 +1,17 @@
-﻿using System.Collections.Concurrent;
+﻿using Microsoft.Extensions.Options;
+using System.Collections.Concurrent;
 
 namespace Blazix.Query;
 
-internal abstract class QueryCacheEntry
+internal abstract class QueryCacheEntry(TimeProvider timeProvider)
 {
+    protected readonly TimeProvider timeProvider = timeProvider;
+
     public Exception? Error { get; protected set; }
     public QueryStatus Status { get; protected set; } = QueryStatus.Pending;
     public QueryFetchStatus FetchStatus { get; protected set; } = QueryFetchStatus.Idle;
     public DateTime LastSuccessAt { get; set; }
+    public bool IsStale(TimeSpan staleTime) => timeProvider.GetUtcNow() - LastSuccessAt > staleTime;
 
     private readonly List<Func<Task>> subscribers = new();
 
@@ -31,6 +35,8 @@ internal abstract class QueryCacheEntry
 
 internal sealed class QueryCacheEntry<TData> : QueryCacheEntry where TData : class
 {
+    public QueryCacheEntry(TimeProvider timeProvider) : base(timeProvider) { }
+
     public TData? Data { get; private set; }
 
     public Task SetSuccess(TData data)
@@ -39,7 +45,7 @@ internal sealed class QueryCacheEntry<TData> : QueryCacheEntry where TData : cla
         Error = null;
         Status = QueryStatus.Success;
         FetchStatus = QueryFetchStatus.Idle;
-        LastSuccessAt = DateTime.UtcNow;
+        LastSuccessAt = timeProvider.GetUtcNow().DateTime;
         return NotifySubscribers();
     }
 
@@ -57,13 +63,15 @@ internal sealed class QueryCacheEntry<TData> : QueryCacheEntry where TData : cla
 /// </summary>
 public sealed class QueryClient
 {
-    private readonly NetworkService networkService;
+    private readonly INetworkService networkService;
+    private readonly TimeProvider timeProvider;
     private readonly ConcurrentDictionary<string, QueryCacheEntry> cache = new();
     private readonly ConcurrentDictionary<string, SemaphoreSlim> fetchSemaphores = new();
 
-    public QueryClient(NetworkService networkService)
+    public QueryClient(INetworkService networkService, TimeProvider timeProvider)
     {
         this.networkService = networkService;
+        this.timeProvider = timeProvider;
     }
 
     /// <summary>
@@ -87,24 +95,23 @@ public sealed class QueryClient
     // Internal method for Query<TData> to get its state
     internal QueryCacheEntry<TData> GetCacheEntry<TData>(string key) where TData : class
     {
-        var entry = cache.GetOrAdd(key, _ => new QueryCacheEntry<TData>());
+        var entry = cache.GetOrAdd(key, _ => new QueryCacheEntry<TData>(timeProvider));
         return (QueryCacheEntry<TData>)entry;
     }
 
     // The core fetching logic
-    internal async Task FetchQueryAsync<TData>(string key, Func<Task<TData>> queryFn) where TData : class
+    internal async Task FetchQueryAsync<TData>(
+        string key,
+        Func<Task<TData>> queryFn,
+        QueryOptions options) where TData : class
     {
         var entry = (QueryCacheEntry<TData>)cache[key];
-
-        // Use a semaphore to prevent multiple simultaneous fetches for the same key
         var semaphore = fetchSemaphores.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
         await semaphore.WaitAsync();
 
         try
         {
-            // Double-check if another thread already fetched while we were waiting
             if (entry.FetchStatus == QueryFetchStatus.Fetching) return;
-
             if (!networkService.IsOnline)
             {
                 await entry.SetFetchStatus(QueryFetchStatus.Paused);
@@ -113,14 +120,25 @@ public sealed class QueryClient
 
             await entry.SetFetchStatus(QueryFetchStatus.Fetching);
 
-            try
+            int attempts = 0;
+            while (true)
             {
-                var data = await queryFn();
-                await entry.SetSuccess(data);
-            }
-            catch (Exception e)
-            {
-                await entry.SetError(e);
+                try
+                {
+                    var data = await queryFn();
+                    await entry.SetSuccess(data);
+                    break;
+                }
+                catch (Exception e)
+                {
+                    attempts++;
+                    if (attempts > options.Retry)
+                    {
+                        await entry.SetError(e);
+                        break;
+                    }
+                    await Task.Delay(options.RetryDelay);
+                }
             }
         }
         finally

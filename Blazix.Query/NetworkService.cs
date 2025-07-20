@@ -2,35 +2,45 @@
 
 namespace Blazix.Query;
 
+
+/// <summary>
+/// Provides an abstraction for monitoring network status.
+/// </summary>
 public interface INetworkService
 {
-    bool IsOnline { get; }
-
+    /// <summary>
+    /// Event raised when the network status changes.
+    /// </summary>
     event Func<Task>? NetworkStatusChanged;
 
+    /// <summary>
+    /// Gets the value indicating whether the system is currently online.
+    /// </summary>
+    bool IsOnline { get; }
+
+    /// <summary>
+    /// Initializes the network service.
+    /// </summary>
     Task InitializeAsync();
 }
 
-public sealed class NetworkService(IJSRuntime jsRuntime) : IAsyncDisposable, INetworkService
+/// <summary>
+/// Monitors the network status using JavaScript.
+/// </summary>
+/// <param name="jsRuntime">The JavaScript runtime dependency.</param>
+public class NetworkService(IJSRuntime jsRuntime) : INetworkService, IAsyncDisposable
 {
     private readonly Lazy<Task<IJSObjectReference>> moduleTask = new(() => jsRuntime.InvokeAsync<IJSObjectReference>(
         "import", "./_content/Blazix.Query/blazix-network.js").AsTask());
     private DotNetObjectReference<NetworkService>? dotNetHelper;
 
-    /// <summary>
-    /// Event raised when the network status changes.
-    /// </summary>
+    /// <inheritdoc />
     public event Func<Task>? NetworkStatusChanged;
 
-    /// <summary>
-    /// Gets the value indicating whether the system is currently online.
-    /// </summary>
+    /// <inheritdoc />
     public bool IsOnline { get; private set; }
 
-    /// <summary>
-    /// Initializes the network service by loading the JavaScript module and setting up the event listener.
-    /// </summary>
-    /// <returns></returns>
+    /// <inheritdoc />
     public async Task InitializeAsync()
     {
         dotNetHelper = DotNetObjectReference.Create(this);
@@ -48,7 +58,7 @@ public sealed class NetworkService(IJSRuntime jsRuntime) : IAsyncDisposable, INe
         IsOnline = isOnline;
         if (NetworkStatusChanged != null)
         {
-            await NetworkStatusChanged?.Invoke()!;
+            await NetworkStatusChanged.Invoke();
         }
     }
 
